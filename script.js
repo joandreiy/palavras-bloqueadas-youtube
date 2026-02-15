@@ -57,8 +57,9 @@
                 if (response.status === 200) {
                     // Normaliza as palavras da sua lista ao baixar
                     const lista = response.responseText.split('\n')
-                                   .map(p => normalizar(p.trim()))
-                                   .filter(p => p.length > 0);
+                                   .map(p => p.trim())
+                                   .filter(p => p.length > 0 && !p.startsWith('#'))
+                                   .map(p => normalizar(p));
 
                     GM_setValue("listaBloqueio", JSON.stringify(lista));
                     const newEtag = response.responseHeaders.match(/etag: (.*)/i);
@@ -115,14 +116,34 @@
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
+            // REMOÇÃO ESPECÍFICA DE ADS QUE DEIXAM BURACOS
+            if (item.querySelector('ytd-ad-slot-renderer') || item.tagName.toLowerCase() === 'ytd-ad-slot-renderer') {
+                const cardAd = item.closest('ytd-rich-item-renderer') || item;
+                cardAd.style.setProperty('display', 'none', 'important');
+                return;
+            }
+
             const textoNormalizado = normalizar(item.innerText);
             const match = termos.find(t => textoNormalizado.includes(t));
 
             if (match) {
-                item.style.setProperty('display', 'none', 'important');
-                if (!cacheBloqueados.has(item)) {
-                    console.log(`${LOG_PREFIX} Bloqueado: "${match}"`);
-                    cacheBloqueados.add(item);
+                // Encontrar o elemento pai principal (card) para ocultar, não apenas o texto interno
+                const card = item.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer') || item;
+                card.style.setProperty('display', 'none', 'important');
+
+                // Tenta ocultar a linha inteira se todos os itens nela estiverem ocultos (reduz buracos verticais)
+                const row = card.closest('ytd-rich-grid-row');
+                if (row) {
+                    const siblings = row.querySelectorAll('ytd-rich-item-renderer');
+                    const allHidden = Array.from(siblings).every(sib => sib.style.display === 'none');
+                    if (allHidden) {
+                        row.style.setProperty('display', 'none', 'important');
+                    }
+                }
+
+                if (!cacheBloqueados.has(card)) {
+                    console.log(`${LOG_PREFIX} Bloqueado: "${match}" em ${card.tagName}`);
+                    cacheBloqueados.add(card);
                 }
             }
         });

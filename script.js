@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro V3.0
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  Bloqueio parental inteligente com whitelist, cache e MutationObserver.
 // @author       Você
 // @match        https://www.youtube.com/*

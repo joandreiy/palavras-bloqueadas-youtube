@@ -111,7 +111,7 @@
         const seletores = [
             'ytd-video-renderer', 'ytd-channel-renderer', 'ytd-rich-item-renderer',
             'yt-lockup-view-model', 'grid-shelf-view-model', 'ytd-compact-video-renderer',
-            'ytd-promoted-video-renderer'
+            'ytd-promoted-video-renderer', 'yt-lockup-metadata-view-model'
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {

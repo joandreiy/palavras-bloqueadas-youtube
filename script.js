@@ -6,6 +6,8 @@
 // @author       Você
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
+// @match        https://www.google.com/*
+// @match        https://www.google.com.br/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -110,9 +112,40 @@
     }
 
     // --- 3. FILTRO DINÂMICO ---
+    function filtrarGoogle() {
+        const seletores = [
+            'div.g',                    // Resultados de texto
+            'div[data-tbnid]',          // Imagens
+            'div.related-question-pair', // "Pessoas também perguntam"
+            'div[data-video-url]',      // Vídeos inline
+            'div.u2tX4e'               // Carousel de vídeos
+        ];
+
+        document.querySelectorAll(seletores.join(',')).forEach(item => {
+            const texto = normalizar(item.innerText);
+            if (estaNoWhitelist(item.innerText)) return;
+            
+            const match = termos.find(t => texto.includes(t));
+            if (match) {
+                item.style.setProperty('display', 'none', 'important');
+                if (!cacheBloqueados.has(item)) {
+                    console.log(`${LOG_PREFIX} Google Bloqueado: "${match}"`);
+                    cacheBloqueados.add(item);
+                }
+            }
+        });
+    }
+
     function aplicarFiltro() {
-        const url = window.location.href;
         if (termos.length === 0) return;
+
+        // Se for Google, usa o filtro específico
+        if (window.location.hostname.includes('google')) {
+            filtrarGoogle();
+            return;
+        }
+
+        const url = window.location.href;
 
         // A) URLs Proibidas
         if (["/shorts", "/feed/subscriptions", "/feed/history", "/feed/you"].some(p => url.includes(p))) {

@@ -84,9 +84,16 @@
 
         // B) Vídeo aberto (Watch)
         if (url.includes("watch")) {
-            const info = normalizar(document.title + " " + (document.body ? document.body.innerText : ""));
+            // Alterado: Busca apenas no Título e Descrição para evitar bloquear por causa de comentários ou sugestões
+            const titulo = document.title;
+            const descricaoElemento = document.querySelector('#description-inline-expander') || document.querySelector('#description');
+            const descricao = descricaoElemento ? descricaoElemento.innerText : "";
+            
+            const info = normalizar(titulo + " " + descricao);
             const match = termos.find(t => info.includes(t));
+            
             if (match) {
+                console.log(`${LOG_PREFIX} Vídeo Bloqueado! Termo encontrado: "${match}"`);
                 window.location.href = "https://www.youtube.com/";
                 return;
             }

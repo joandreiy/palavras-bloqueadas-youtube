@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro V3.0
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  Bloqueio parental inteligente com whitelist, cache e MutationObserver.
 // @author       Você
 // @match        https://www.youtube.com/*
@@ -30,11 +30,14 @@
     let termos = [];
     let cacheBloqueados = new Set();
 
-    // Função para remover acentos e deixar em minúsculo
+    // Função para remover acentos, símbolos e deixar em minúsculo
     function normalizar(texto) {
         return texto.toLowerCase()
                     .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "");
+                    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+                    .replace(/[^a-z0-9\s]/g, " ")    // Substitui símbolos (hífen, pontuação) por espaço
+                    .replace(/\s+/g, " ")            // Remove espaços duplos
+                    .trim();
     }
 
     // Verifica se o texto contém algum termo da whitelist
@@ -52,7 +55,7 @@
         }
     }
 
-    console.log(`${LOG_PREFIX} V3.0 Iniciado.`);
+    console.log(`${LOG_PREFIX} V3.1 Correção de Normalização Iniciada.`);
 
     // --- 1. CSS PARA REMOÇÃO IMEDIATA ---
     const css = `
@@ -114,24 +117,29 @@
     // --- 3. FILTRO DINÂMICO ---
     function filtrarGoogle() {
         const seletores = [
-            'div.g',                    // Resultados de texto
-            'div[data-tbnid]',          // Imagens
+            'div.g',                    // Resultados de texto padrão
+            'div[data-tbnid]',          // Imagens (Google Images)
             'div.related-question-pair', // "Pessoas também perguntam"
             'div[data-video-url]',      // Vídeos inline
-            'div.u2tX4e'               // Carousel de vídeos
+            'div.u2tX4e',               // Carousel de vídeos
+            '#rso > div',               // Blocos principais de resultado (inclui AI Overview)
+            'div[data-hveid]'           // Qualquer elemento com ID de resultado do Google
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
-            const texto = normalizar(item.innerText);
+            // Ignora se o elemento já foi processado ou está oculto
+            if (cacheBloqueados.has(item) || item.style.display === 'none') return;
+
+            // Verifica whitelist primeiro
             if (estaNoWhitelist(item.innerText)) return;
-            
+
+            const texto = normalizar(item.innerText);
             const match = termos.find(t => texto.includes(t));
+            
             if (match) {
                 item.style.setProperty('display', 'none', 'important');
-                if (!cacheBloqueados.has(item)) {
-                    console.log(`${LOG_PREFIX} Google Bloqueado: "${match}"`);
-                    cacheBloqueados.add(item);
-                }
+                console.log(`${LOG_PREFIX} Google Bloqueado: "${match}" em <${item.tagName} class="${item.className}">`);
+                cacheBloqueados.add(item);
             }
         });
     }

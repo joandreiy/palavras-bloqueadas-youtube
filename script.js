@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         YouTube Kids Pro - Sem Acentos V2.6
+// @name         YouTube Kids Pro V3.0
 // @namespace    http://tampermonkey.net/
-// @version      2.8
-// @description  Bloqueio total: ignora Maiúsculas, Minúsculas e Acentos.
+// @version      3.0
+// @description  Bloqueio parental inteligente com whitelist, cache e MutationObserver.
 // @author       Você
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
@@ -17,6 +17,15 @@
 
     const URL_DA_LISTA = "https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/palavras";
     const LOG_PREFIX = "[Bloqueador Parental]";
+
+    // --- WHITELIST: Canais/palavras que NUNCA devem ser bloqueados ---
+    const WHITELIST = [
+        'mundo bita',
+        'galinha pintadinha',
+        'patati patata',
+    ];
+
+    let termos = [];
     let cacheBloqueados = new Set();
 
     // Função para remover acentos e deixar em minúsculo
@@ -26,19 +35,42 @@
                     .replace(/[\u0300-\u036f]/g, "");
     }
 
-    console.log(`${LOG_PREFIX} Iniciado com proteção de acentos.`);
+    // Verifica se o texto contém algum termo da whitelist
+    function estaNoWhitelist(texto) {
+        const textoNorm = normalizar(texto);
+        return WHITELIST.some(w => textoNorm.includes(normalizar(w)));
+    }
+
+    // Carrega os termos do cache (executado uma vez, não a cada mutação)
+    function carregarTermos() {
+        const dados = GM_getValue("listaBloqueio");
+        if (dados) {
+            termos = JSON.parse(dados);
+            console.log(`${LOG_PREFIX} ${termos.length} termos carregados do cache.`);
+        }
+    }
+
+    console.log(`${LOG_PREFIX} V3.0 Iniciado.`);
 
     // --- 1. CSS PARA REMOÇÃO IMEDIATA ---
     const css = `
+        /* Shorts */
         ytd-guide-entry-renderer:has(a[title="Shorts"]),
+        /* Menu lateral desnecessário */
         ytd-guide-section-renderer:has(a[href="/feed/you"]),
         ytd-guide-section-renderer:has(a[href="/feed/subscriptions"]),
         ytd-guide-section-renderer:has(a[href="/premium"]),
         ytd-guide-section-renderer:has(a[href="/account"]),
         #footer.ytd-guide-renderer,
+        /* Shorts e Reels */
         ytd-rich-section-renderer, ytd-reel-shelf-renderer,
         ytm-reel-shelf-renderer, grid-shelf-view-model,
-        ytd-ad-slot-renderer, #player-ads {
+        /* Anúncios */
+        ytd-ad-slot-renderer, #player-ads,
+        /* Comentários */
+        ytd-comments#comments,
+        /* Chat ao vivo */
+        ytd-live-chat-frame {
             display: none !important;
         }
     `;
@@ -46,7 +78,7 @@
     style.textContent = css;
     document.documentElement.appendChild(style);
 
-    // --- 2. ATUALIZAÇÃO COM NORMALIZAÇÃO ---
+    // --- 2. SINCRONIZAÇÃO DA LISTA ---
     function sincronizarLista() {
         const lastEtag = GM_getValue("lista_etag", "");
         GM_xmlhttpRequest({
@@ -55,7 +87,6 @@
             headers: { "If-None-Match": lastEtag },
             onload: function(response) {
                 if (response.status === 200) {
-                    // Normaliza as palavras da sua lista ao baixar
                     const lista = response.responseText.split('\n')
                                    .map(p => p.trim())
                                    .filter(p => p.length > 0 && !p.startsWith('#'))
@@ -64,8 +95,16 @@
                     GM_setValue("listaBloqueio", JSON.stringify(lista));
                     const newEtag = response.responseHeaders.match(/etag: (.*)/i);
                     if (newEtag) GM_setValue("lista_etag", newEtag[1]);
-                    console.info(`${LOG_PREFIX} Lista atualizada e sem acentos.`);
+
+                    // Atualiza o cache em memória imediatamente
+                    termos = lista;
+                    console.info(`${LOG_PREFIX} Lista atualizada: ${lista.length} termos baixados.`);
+                } else if (response.status === 304) {
+                    console.info(`${LOG_PREFIX} Lista não modificada, usando cache.`);
                 }
+            },
+            onerror: function() {
+                console.warn(`${LOG_PREFIX} Falha ao baixar lista. Usando cache local.`);
             }
         });
     }
@@ -73,9 +112,7 @@
     // --- 3. FILTRO DINÂMICO ---
     function aplicarFiltro() {
         const url = window.location.href;
-        const dados = GM_getValue("listaBloqueio");
-        if (!dados) return;
-        const termos = JSON.parse(dados);
+        if (termos.length === 0) return;
 
         // A) URLs Proibidas
         if (["/shorts", "/feed/subscriptions", "/feed/history", "/feed/you"].some(p => url.includes(p))) {
@@ -85,18 +122,22 @@
 
         // B) Vídeo aberto (Watch)
         if (url.includes("watch")) {
-            // Alterado: Busca apenas no Título e Descrição para evitar bloquear por causa de comentários ou sugestões
             const titulo = document.title;
             const descricaoElemento = document.querySelector('#description-inline-expander') || document.querySelector('#description');
             const descricao = descricaoElemento ? descricaoElemento.innerText : "";
-            
-            const info = normalizar(titulo + " " + descricao);
-            const match = termos.find(t => info.includes(t));
-            
-            if (match) {
-                console.log(`${LOG_PREFIX} Vídeo Bloqueado! Termo encontrado: "${match}"`);
-                window.location.href = "https://www.youtube.com/";
-                return;
+
+            const textoCompleto = titulo + " " + descricao;
+
+            // Verifica whitelist antes de bloquear
+            if (!estaNoWhitelist(textoCompleto)) {
+                const info = normalizar(textoCompleto);
+                const match = termos.find(t => info.includes(t));
+
+                if (match) {
+                    console.log(`${LOG_PREFIX} Vídeo Bloqueado! Termo: "${match}"`);
+                    window.location.href = "https://www.youtube.com/";
+                    return;
+                }
             }
         }
 
@@ -116,22 +157,26 @@
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
-            // REMOÇÃO ESPECÍFICA DE ADS QUE DEIXAM BURACOS
+            // Remoção de Ads que deixam buracos
             if (item.querySelector('ytd-ad-slot-renderer') || item.tagName.toLowerCase() === 'ytd-ad-slot-renderer') {
                 const cardAd = item.closest('ytd-rich-item-renderer') || item;
                 cardAd.style.setProperty('display', 'none', 'important');
                 return;
             }
 
-            const textoNormalizado = normalizar(item.innerText);
+            const textoOriginal = item.innerText;
+
+            // Verifica whitelist: se o card contém texto da whitelist, não bloqueia
+            if (estaNoWhitelist(textoOriginal)) return;
+
+            const textoNormalizado = normalizar(textoOriginal);
             const match = termos.find(t => textoNormalizado.includes(t));
 
             if (match) {
-                // Encontrar o elemento pai principal (card) para ocultar, não apenas o texto interno
                 const card = item.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer') || item;
                 card.style.setProperty('display', 'none', 'important');
 
-                // Tenta ocultar a linha inteira se todos os itens nela estiverem ocultos (reduz buracos verticais)
+                // Oculta linha inteira se todos os itens estiverem ocultos
                 const row = card.closest('ytd-rich-grid-row');
                 if (row) {
                     const siblings = row.querySelectorAll('ytd-rich-item-renderer');
@@ -149,7 +194,7 @@
         });
     }
 
-    // --- 4. OTIMIZAÇÃO COM MUTATION OBSERVER (Substitui setInterval) ---
+    // --- 4. MUTATION OBSERVER ---
     function debounce(fn, delay) {
         let timer;
         return function() {
@@ -164,16 +209,18 @@
     function iniciarObservador() {
         if (document.body) {
             observer.observe(document.body, { childList: true, subtree: true });
-            aplicarFiltro(); // Execução inicial imediata
+            aplicarFiltro();
             console.log(`${LOG_PREFIX} Observer iniciado com sucesso.`);
         } else {
-            setTimeout(iniciarObservador, 50); // Tenta novamente em 50ms se o body não existir
+            setTimeout(iniciarObservador, 50);
         }
     }
 
-    sincronizarLista();
+    // --- INICIALIZAÇÃO ---
+    carregarTermos();   // Carrega cache imediato (sem esperar download)
+    sincronizarLista(); // Baixa atualização em background
     iniciarObservador();
 
-    // Garante re-verificação em navegações internas do YouTube (SPA)
+    // Re-verificação em navegações internas do YouTube (SPA)
     window.addEventListener('yt-navigate-finish', aplicarFiltro);
 })();

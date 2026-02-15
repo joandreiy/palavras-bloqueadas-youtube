@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro - Sem Acentos V2.6
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  Bloqueio total: ignora Maiúsculas, Minúsculas e Acentos.
 // @author       Você
 // @match        https://www.youtube.com/*
@@ -150,5 +150,5 @@
     }
 
     sincronizarLista();
-    setInterval(aplicarFiltro, 1000);
+    setInterval(aplicarFiltro, 400);
 })();

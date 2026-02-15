@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro - Sem Acentos V2.6
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @description  Bloqueio total: ignora Maiúsculas, Minúsculas e Acentos.
 // @author       Você
 // @match        https://www.youtube.com/*
@@ -149,6 +149,31 @@
         });
     }
 
+    // --- 4. OTIMIZAÇÃO COM MUTATION OBSERVER (Substitui setInterval) ---
+    function debounce(fn, delay) {
+        let timer;
+        return function() {
+            clearTimeout(timer);
+            timer = setTimeout(fn, delay);
+        };
+    }
+
+    const filtroComDebounce = debounce(aplicarFiltro, 150);
+    const observer = new MutationObserver(filtroComDebounce);
+
+    function iniciarObservador() {
+        if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+            aplicarFiltro(); // Execução inicial imediata
+            console.log(`${LOG_PREFIX} Observer iniciado com sucesso.`);
+        } else {
+            setTimeout(iniciarObservador, 50); // Tenta novamente em 50ms se o body não existir
+        }
+    }
+
     sincronizarLista();
-    setInterval(aplicarFiltro, 400);
+    iniciarObservador();
+
+    // Garante re-verificação em navegações internas do YouTube (SPA)
+    window.addEventListener('yt-navigate-finish', aplicarFiltro);
 })();

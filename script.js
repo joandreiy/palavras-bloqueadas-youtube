@@ -1,20 +1,8 @@
-// ==UserScript==
-// @name         YouTube Kids Pro V3.0
-// @namespace    http://tampermonkey.net/
-// @version      3.2
-// @description  Bloqueio parental inteligente com whitelist, cache e MutationObserver.
-// @author       Você
-// @match        https://www.youtube.com/*
-// @match        https://m.youtube.com/*
-// @match        https://www.google.com/*
-// @match        https://www.google.com.br/*
-// @grant        GM_xmlhttpRequest
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @run-at       document-start
-// ==/UserScript==
+// YouTube Kids Pro V3.2 — Script principal (carregado dinamicamente pelo loader)
+// NÃO instale este arquivo diretamente no Tampermonkey.
+// Use o loader.user.js que busca este script automaticamente do GitHub.
 
-(function() {
+(function(GM_xmlhttpRequest, GM_setValue, GM_getValue) {
     'use strict';
 
     const URL_DA_LISTA = "https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/palavras";
@@ -367,4 +355,4 @@
 
     // Re-verificação em navegações internas do YouTube (SPA)
     window.addEventListener('yt-navigate-finish', aplicarFiltro);
-})();
+})(GM_xmlhttpRequest, GM_setValue, GM_getValue);

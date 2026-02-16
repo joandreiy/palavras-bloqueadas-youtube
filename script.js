@@ -1,8 +1,15 @@
-// YouTube Kids Pro V3.2 — Script principal (carregado dinamicamente pelo loader)
-// NÃO instale este arquivo diretamente no Tampermonkey.
-// Use o loader.user.js que busca este script automaticamente do GitHub.
+// ==UserScript==
+// @name         YouTube Kids Pro V3.2 (Main Script)
+// @namespace    http://tampermonkey.net/
+// @version      3.2
+// @description  Script principal - carregado via @require pelo loader
+// @author       Você
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
 
-(function(GM_xmlhttpRequest, GM_setValue, GM_getValue) {
+(function() {
     'use strict';
 
     const URL_DA_LISTA = "https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/palavras";
@@ -355,4 +362,4 @@
 
     // Re-verificação em navegações internas do YouTube (SPA)
     window.addEventListener('yt-navigate-finish', aplicarFiltro);
-})(GM_xmlhttpRequest, GM_setValue, GM_getValue);
+})();

@@ -149,13 +149,18 @@
         if (match) {
             console.log(`${LOG_PREFIX} Query bloqueada: "${match}" na busca "${query}"`);
 
-            // Oculta todo o conteúdo da página (resultados + painel lateral)
+            // Oculta todo o conteúdo da página (resultados + painel lateral + AI Overview)
             const rso = document.getElementById('rso');
             if (rso) rso.style.setProperty('display', 'none', 'important');
             const searchDiv = document.getElementById('search');
             if (searchDiv) searchDiv.style.setProperty('display', 'none', 'important');
             const rhs = document.getElementById('rhs');
             if (rhs) rhs.style.setProperty('display', 'none', 'important');
+            
+            // Oculta especificamente os painéis de AI Overview
+            document.querySelectorAll('div.pWvJNd, div.mZJni, div.Dn7Fzd').forEach(el => {
+                el.style.setProperty('display', 'none', 'important');
+            });
 
             // Mostra aviso no corpo do resultado
             const center = document.getElementById('center_col') || document.getElementById('rcnt');
@@ -185,6 +190,9 @@
             'div[data-video-url]',      // Vídeos inline (mobile/desktop)
             'g-card',                   // Cards genéricos do Google (vídeos, carousels)
             'g-inner-card',             // Cards internos
+            'div.pWvJNd',               // AI Overview (painel de IA do Google)
+            'div.mZJni',                // AI Overview content container
+            'div.Dn7Fzd',               // AI Overview inner content
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {

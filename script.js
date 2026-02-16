@@ -226,20 +226,6 @@
             return;
         }
 
-        // A.1) Busca no YouTube: verifica a query de pesquisa
-        if (url.includes("/results")) {
-            const params = new URLSearchParams(window.location.search);
-            const query = params.get('search_query');
-            if (query && !estaNoWhitelist(query)) {
-                const match = contemTermo(query);
-                if (match) {
-                    console.log(`${LOG_PREFIX} Busca YouTube bloqueada: "${match}" na query "${query}"`);
-                    window.location.href = "https://www.youtube.com/";
-                    return;
-                }
-            }
-        }
-
         // B) Vídeo aberto (Watch)
         if (url.includes("watch")) {
             const titulo = document.title;

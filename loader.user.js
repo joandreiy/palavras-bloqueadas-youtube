@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro V3.2 (Loader)
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.3
 // @description  Loader que busca o script principal do GitHub automaticamente.
 // @author       Você
 // @match        https://www.youtube.com/*

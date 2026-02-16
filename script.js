@@ -149,18 +149,16 @@
         if (match) {
             console.log(`${LOG_PREFIX} Query bloqueada: "${match}" na busca "${query}"`);
 
-            // Oculta todo o conteúdo da página (resultados + painel lateral + AI Overview)
-            const rso = document.getElementById('rso');
-            if (rso) rso.style.setProperty('display', 'none', 'important');
-            const searchDiv = document.getElementById('search');
-            if (searchDiv) searchDiv.style.setProperty('display', 'none', 'important');
-            const rhs = document.getElementById('rhs');
-            if (rhs) rhs.style.setProperty('display', 'none', 'important');
-            
-            // Oculta especificamente os painéis de AI Overview
-            document.querySelectorAll('div.pWvJNd, div.mZJni, div.Dn7Fzd').forEach(el => {
-                el.style.setProperty('display', 'none', 'important');
-            });
+            // Oculta TODOS os filhos de #rcnt (container principal dos resultados)
+            // Isso cobre resultados, AI Overview, painel lateral, etc.
+            const rcnt = document.getElementById('rcnt');
+            if (rcnt) {
+                Array.from(rcnt.children).forEach(child => {
+                    if (child.id !== 'bloqueio-aviso') {
+                        child.style.setProperty('display', 'none', 'important');
+                    }
+                });
+            }
 
             // Mostra aviso no corpo do resultado
             const center = document.getElementById('center_col') || document.getElementById('rcnt');
@@ -180,7 +178,7 @@
         // Primeiro: verifica se a query inteira é bloqueada
         if (verificarQueryGoogle()) return;
 
-        // Segundo: filtra resultados individuais
+        // Segundo: filtra resultados individuais por seletores conhecidos
         const seletores = [
             '#search .g',               // Resultados de texto dentro do container search
             '#rso .MjjYud',             // Blocos de resultado modernos
@@ -190,9 +188,6 @@
             'div[data-video-url]',      // Vídeos inline (mobile/desktop)
             'g-card',                   // Cards genéricos do Google (vídeos, carousels)
             'g-inner-card',             // Cards internos
-            'div.pWvJNd',               // AI Overview (painel de IA do Google)
-            'div.mZJni',                // AI Overview content container
-            'div.Dn7Fzd',               // AI Overview inner content
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
@@ -215,6 +210,41 @@
                 item.dataset.bloqueioChecked = '1';
             }
         });
+
+        // Terceiro: varredura genérica para pegar containers que escaparam dos seletores
+        // (ex: AI Overview e outros painéis dinâmicos do Google)
+        const rcnt = document.getElementById('rcnt');
+        if (rcnt) {
+            Array.from(rcnt.querySelectorAll('div[data-hveid], section, g-section-with-header')).forEach(item => {
+                if (item.dataset.bloqueioChecked || item.style.display === 'none') return;
+                // Ignora containers muito pequenos (provavelmente sub-elementos)
+                if (item.innerText.length < 20) return;
+
+                if (estaNoWhitelist(item.innerText)) {
+                    item.dataset.bloqueioChecked = '1';
+                    return;
+                }
+
+                const match = contemTermo(item.innerText);
+                if (match) {
+                    // Sobe até o container de nível adequado para ocultar
+                    let target = item;
+                    let parent = item.parentElement;
+                    while (parent && parent.id !== 'rcnt' && parent.id !== 'rso' && parent.id !== 'search') {
+                        // Se o pai tem data-hveid, ele é um container de resultado do Google
+                        if (parent.dataset && parent.dataset.hveid !== undefined) {
+                            target = parent;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    target.style.setProperty('display', 'none', 'important');
+                    target.dataset.bloqueioChecked = '1';
+                    console.log(`${LOG_PREFIX} Google genérico bloqueado: "${match}" em <${target.tagName} class="${target.className}">`);
+                } else {
+                    item.dataset.bloqueioChecked = '1';
+                }
+            });
+        }
     }
 
     function aplicarFiltro() {

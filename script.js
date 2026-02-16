@@ -40,6 +40,30 @@
                     .trim();
     }
 
+    // Cache de RegExp para performance
+    let regexCache = new Map();
+
+    function criarRegex(termo) {
+        if (!regexCache.has(termo)) {
+            // Escapa caracteres especiais de regex e adiciona word boundaries
+            const escaped = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // \b = word boundary — só faz match de palavras inteiras (suporta acentos unicode se necessário, mas aqui usaremos \b padrão para os termos normalizados)
+            // Como normalizamos para remover acentos, \b funciona bem.
+            regexCache.set(termo, new RegExp(`\\b${escaped}\\b`, 'i'));
+        }
+        return regexCache.get(termo);
+    }
+
+    function contemTermo(texto) {
+        const textoNorm = normalizar(texto);
+        for (const termo of termos) {
+            if (criarRegex(termo).test(textoNorm)) {
+                return termo;
+            }
+        }
+        return null;
+    }
+
     // Verifica se o texto contém algum termo da whitelist
     function estaNoWhitelist(texto) {
         const textoNorm = normalizar(texto);
@@ -103,6 +127,7 @@
 
                     // Atualiza o cache em memória imediatamente
                     termos = lista;
+                    regexCache.clear(); // Limpa cache ao atualizar lista
                     console.info(`${LOG_PREFIX} Lista atualizada: ${lista.length} termos baixados.`);
                 } else if (response.status === 304) {
                     console.info(`${LOG_PREFIX} Lista não modificada, usando cache.`);
@@ -115,31 +140,76 @@
     }
 
     // --- 3. FILTRO DINÂMICO ---
+
+    // Verifica se a QUERY de pesquisa do Google contém termos bloqueados
+    function verificarQueryGoogle() {
+        const params = new URLSearchParams(window.location.search);
+        const query = params.get('q');
+        if (!query) return false;
+
+        // Verifica whitelist primeiro
+        if (estaNoWhitelist(query)) return false;
+
+        const match = contemTermo(query);
+        if (match) {
+            console.log(`${LOG_PREFIX} Query bloqueada: "${match}" na busca "${query}"`);
+
+            // Oculta todo o conteúdo da página (resultados + painel lateral)
+            const rso = document.getElementById('rso');
+            if (rso) rso.style.setProperty('display', 'none', 'important');
+            const searchDiv = document.getElementById('search');
+            if (searchDiv) searchDiv.style.setProperty('display', 'none', 'important');
+            const rhs = document.getElementById('rhs');
+            if (rhs) rhs.style.setProperty('display', 'none', 'important');
+
+            // Mostra aviso no corpo do resultado
+            const center = document.getElementById('center_col') || document.getElementById('rcnt');
+            if (center && !document.getElementById('bloqueio-aviso')) {
+                const aviso = document.createElement('div');
+                aviso.id = 'bloqueio-aviso';
+                aviso.style.cssText = 'padding:40px;text-align:center;color:#f28b82;font-size:20px;font-family:Arial,sans-serif;';
+                aviso.textContent = '🚫 Pesquisa bloqueada pelo controle parental.';
+                center.prepend(aviso);
+            }
+            return true;
+        }
+        return false;
+    }
+
     function filtrarGoogle() {
+        // Primeiro: verifica se a query inteira é bloqueada
+        if (verificarQueryGoogle()) return;
+
+        // Segundo: filtra resultados individuais
         const seletores = [
-            'div.g',                    // Resultados de texto padrão
+            '#search .g',               // Resultados de texto dentro do container search
+            '#rso .MjjYud',             // Blocos de resultado modernos
+            'div.g',                    // Resultados de texto padrão (fallback)
             'div[data-tbnid]',          // Imagens (Google Images)
             'div.related-question-pair', // "Pessoas também perguntam"
-            'div[data-video-url]',      // Vídeos inline
-            'div.u2tX4e',               // Carousel de vídeos
-            '#rso > div',               // Blocos principais de resultado (inclui AI Overview)
-            'div[data-hveid]'           // Qualquer elemento com ID de resultado do Google
+            'div[data-video-url]',      // Vídeos inline (mobile/desktop)
+            'g-card',                   // Cards genéricos do Google (vídeos, carousels)
+            'g-inner-card',             // Cards internos
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
             // Ignora se o elemento já foi processado ou está oculto
-            if (cacheBloqueados.has(item) || item.style.display === 'none') return;
+            if (item.dataset.bloqueioChecked || item.style.display === 'none') return;
 
             // Verifica whitelist primeiro
-            if (estaNoWhitelist(item.innerText)) return;
+            if (estaNoWhitelist(item.innerText)) {
+                item.dataset.bloqueioChecked = '1';
+                return;
+            }
 
-            const texto = normalizar(item.innerText);
-            const match = termos.find(t => texto.includes(t));
+            const texto = item.innerText;
+            const match = contemTermo(texto);
             
             if (match) {
                 item.style.setProperty('display', 'none', 'important');
                 console.log(`${LOG_PREFIX} Google Bloqueado: "${match}" em <${item.tagName} class="${item.className}">`);
-                cacheBloqueados.add(item);
+            } else {
+                item.dataset.bloqueioChecked = '1';
             }
         });
     }
@@ -161,6 +231,20 @@
             return;
         }
 
+        // A.1) Busca no YouTube: verifica a query de pesquisa
+        if (url.includes("/results")) {
+            const params = new URLSearchParams(window.location.search);
+            const query = params.get('search_query');
+            if (query && !estaNoWhitelist(query)) {
+                const match = contemTermo(query);
+                if (match) {
+                    console.log(`${LOG_PREFIX} Busca YouTube bloqueada: "${match}" na query "${query}"`);
+                    window.location.href = "https://www.youtube.com/";
+                    return;
+                }
+            }
+        }
+
         // B) Vídeo aberto (Watch)
         if (url.includes("watch")) {
             const titulo = document.title;
@@ -171,8 +255,7 @@
 
             // Verifica whitelist antes de bloquear
             if (!estaNoWhitelist(textoCompleto)) {
-                const info = normalizar(textoCompleto);
-                const match = termos.find(t => info.includes(t));
+                const match = contemTermo(textoCompleto);
 
                 if (match) {
                     console.log(`${LOG_PREFIX} Vídeo Bloqueado! Termo: "${match}"`);
@@ -198,6 +281,8 @@
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
+            if (item.dataset.bloqueioChecked) return;
+
             // Remoção de Ads que deixam buracos
             if (item.querySelector('ytd-ad-slot-renderer') || item.tagName.toLowerCase() === 'ytd-ad-slot-renderer') {
                 const cardAd = item.closest('ytd-rich-item-renderer') || item;
@@ -208,10 +293,12 @@
             const textoOriginal = item.innerText;
 
             // Verifica whitelist: se o card contém texto da whitelist, não bloqueia
-            if (estaNoWhitelist(textoOriginal)) return;
+            if (estaNoWhitelist(textoOriginal)) {
+                 item.dataset.bloqueioChecked = '1';
+                 return;
+            }
 
-            const textoNormalizado = normalizar(textoOriginal);
-            const match = termos.find(t => textoNormalizado.includes(t));
+            const match = contemTermo(textoOriginal);
 
             if (match) {
                 const card = item.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer') || item;
@@ -227,10 +314,9 @@
                     }
                 }
 
-                if (!cacheBloqueados.has(card)) {
-                    console.log(`${LOG_PREFIX} Bloqueado: "${match}" em ${card.tagName}`);
-                    cacheBloqueados.add(card);
-                }
+                console.log(`${LOG_PREFIX} Bloqueado: "${match}" em ${card.tagName}`);
+            } else {
+                 item.dataset.bloqueioChecked = '1';
             }
         });
     }
@@ -244,12 +330,29 @@
         };
     }
 
-    const filtroComDebounce = debounce(aplicarFiltro, 150);
+    const delayGoogle = 300;
+    const delayYouTube = 150;
+    const delay = window.location.hostname.includes('google') ? delayGoogle : delayYouTube;
+    
+    const filtroComDebounce = debounce(aplicarFiltro, delay);
     const observer = new MutationObserver(filtroComDebounce);
 
     function iniciarObservador() {
         if (document.body) {
             observer.observe(document.body, { childList: true, subtree: true });
+            
+             // Navegação SPA do Google (monitorar mudanças de title/url)
+            if (window.location.hostname.includes('google')) {
+                let lastUrl = location.href;
+                new MutationObserver(() => {
+                    const url = location.href;
+                    if (url !== lastUrl) {
+                        lastUrl = url;
+                        setTimeout(aplicarFiltro, 500); // Re-aplica filtro após troca de página SPA
+                    }
+                }).observe(document, {subtree: true, childList: true}); // Google altera o DOM massivamente na navegação
+            }
+            
             aplicarFiltro();
             console.log(`${LOG_PREFIX} Observer iniciado com sucesso.`);
         } else {

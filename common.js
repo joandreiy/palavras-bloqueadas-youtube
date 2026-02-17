@@ -95,7 +95,7 @@ window.BloqueadorParental = (function() {
     function carregarTermos() {
         const dados = GM_getValue("listaBloqueio");
         if (dados) {
-            termos = JSON.parse(dados);
+            termos = JSON.parse(dados).filter(t => t && t.trim().length > 0);
             console.log(`${LOG_PREFIX} ${termos.length} termos carregados do cache.`);
         } else {
             console.warn(`${LOG_PREFIX} Nenhum termo no cache!`);
@@ -113,7 +113,8 @@ window.BloqueadorParental = (function() {
                     const lista = response.responseText.split('\n')
                                    .map(p => p.trim())
                                    .filter(p => p.length > 0 && !p.startsWith('#'))
-                                   .map(p => normalizar(p));
+                                   .map(p => normalizar(p))
+                                   .filter(p => p.length > 0); // Remove empty strings after normalization
 
                     GM_setValue("listaBloqueio", JSON.stringify(lista));
                     const newEtag = response.responseHeaders.match(/etag: (.*)/i);

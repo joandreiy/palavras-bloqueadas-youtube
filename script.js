@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Kids Pro V3.2 (Main Script)
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.3
 // @description  Script principal - carregado via @require pelo loader
 // @author       Você
 // @grant        GM_xmlhttpRequest
@@ -191,23 +191,30 @@
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
-            // Ignora se o elemento já foi processado ou está oculto
-            if (item.dataset.bloqueioChecked || item.style.display === 'none') return;
+            if (item.style.display === 'none') return;
+
+            const texto = item.innerText || '';
+            const textoLen = texto.length.toString();
+
+            // Ignora se já verificou com o mesmo conteúdo
+            if (item.dataset.bloqueioChecked === textoLen) return;
+
+            // Não marca como verificado se ainda não tem texto suficiente
+            if (texto.trim().length < 3) return;
 
             // Verifica whitelist primeiro
-            if (estaNoWhitelist(item.innerText)) {
-                item.dataset.bloqueioChecked = '1';
+            if (estaNoWhitelist(texto)) {
+                item.dataset.bloqueioChecked = textoLen;
                 return;
             }
 
-            const texto = item.innerText;
             const match = contemTermo(texto);
             
             if (match) {
                 item.style.setProperty('display', 'none', 'important');
                 console.log(`${LOG_PREFIX} Google Bloqueado: "${match}" em <${item.tagName} class="${item.className}">`);
             } else {
-                item.dataset.bloqueioChecked = '1';
+                item.dataset.bloqueioChecked = textoLen;
             }
         });
 
@@ -216,16 +223,21 @@
         const rcnt = document.getElementById('rcnt');
         if (rcnt) {
             Array.from(rcnt.querySelectorAll('div[data-hveid], section, g-section-with-header')).forEach(item => {
-                if (item.dataset.bloqueioChecked || item.style.display === 'none') return;
-                // Ignora containers muito pequenos (provavelmente sub-elementos)
-                if (item.innerText.length < 20) return;
+                if (item.style.display === 'none') return;
 
-                if (estaNoWhitelist(item.innerText)) {
-                    item.dataset.bloqueioChecked = '1';
+                const texto = item.innerText || '';
+                const textoLen = texto.length.toString();
+
+                if (item.dataset.bloqueioChecked === textoLen) return;
+                // Ignora containers muito pequenos (provavelmente sub-elementos)
+                if (texto.trim().length < 20) return;
+
+                if (estaNoWhitelist(texto)) {
+                    item.dataset.bloqueioChecked = textoLen;
                     return;
                 }
 
-                const match = contemTermo(item.innerText);
+                const match = contemTermo(texto);
                 if (match) {
                     // Sobe até o container de nível adequado para ocultar
                     let target = item;
@@ -238,10 +250,10 @@
                         parent = parent.parentElement;
                     }
                     target.style.setProperty('display', 'none', 'important');
-                    target.dataset.bloqueioChecked = '1';
+                    target.dataset.bloqueioChecked = textoLen;
                     console.log(`${LOG_PREFIX} Google genérico bloqueado: "${match}" em <${target.tagName} class="${target.className}">`);
                 } else {
-                    item.dataset.bloqueioChecked = '1';
+                    item.dataset.bloqueioChecked = textoLen;
                 }
             });
         }
@@ -300,8 +312,6 @@
         ];
 
         document.querySelectorAll(seletores.join(',')).forEach(item => {
-            if (item.dataset.bloqueioChecked) return;
-
             // Remoção de Ads que deixam buracos
             if (item.querySelector('ytd-ad-slot-renderer') || item.tagName.toLowerCase() === 'ytd-ad-slot-renderer') {
                 const cardAd = item.closest('ytd-rich-item-renderer') || item;
@@ -309,11 +319,18 @@
                 return;
             }
 
-            const textoOriginal = item.innerText;
+            const textoOriginal = item.innerText || '';
+            const textoLen = textoOriginal.length.toString();
+
+            // Ignora se já verificou com o mesmo conteúdo
+            if (item.dataset.bloqueioChecked === textoLen) return;
+
+            // Não marca como verificado se ainda não tem texto carregado
+            if (textoOriginal.trim().length < 3) return;
 
             // Verifica whitelist: se o card contém texto da whitelist, não bloqueia
             if (estaNoWhitelist(textoOriginal)) {
-                 item.dataset.bloqueioChecked = '1';
+                 item.dataset.bloqueioChecked = textoLen;
                  return;
             }
 
@@ -335,7 +352,7 @@
 
                 console.log(`${LOG_PREFIX} Bloqueado: "${match}" em ${card.tagName}`);
             } else {
-                 item.dataset.bloqueioChecked = '1';
+                 item.dataset.bloqueioChecked = textoLen;
             }
         });
     }

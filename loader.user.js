@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         YouTube Kids Pro V3.2 (Loader)
+// @name         YouTube Kids Pro V3.3 (Loader)
 // @namespace    http://tampermonkey.net/
 // @version      3.3
-// @description  Loader que busca o script principal do GitHub automaticamente.
+// @description  Loader que busca os scripts principal do GitHub automaticamente.
 // @author       Você
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
@@ -12,8 +12,9 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/script.js
+// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/google-script.js
 // @run-at       document-start
 // ==/UserScript==
 
-// O script principal é carregado automaticamente via @require
-// Não há código adicional necessário aqui - o Tampermonkey gerencia tudo
+// Os scripts são carregados automaticamente via @require
+// script.js = YouTube | google-script.js = Google Search

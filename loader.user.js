@@ -11,9 +11,9 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/common.js
-// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/youtube-script.js
-// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/google-script.js
+// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/common.js?v=2
+// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/youtube-script.js?v=2
+// @require      https://raw.githubusercontent.com/joandreiy/palavras-bloqueadas-youtube/main/google-script.js?v=2
 // @run-at       document-start
 // ==/UserScript==
 

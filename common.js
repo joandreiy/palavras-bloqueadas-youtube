@@ -42,13 +42,43 @@ window.BloqueadorParental = (function() {
     function criarRegex(termo) {
         if (!regexCache.has(termo)) {
             const escaped = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            regexCache.set(termo, new RegExp(`\\b${escaped}\\b`, 'i'));
+            const regex = new RegExp('\\b' + escaped + '\\b', 'i');
+            regexCache.set(termo, regex);
         }
         return regexCache.get(termo);
     }
 
+    // Contador para limitar debug logs
+    let contemTermoDebugCount = 0;
+
     function contemTermo(texto) {
         const textoNorm = normalizar(texto);
+
+        // Debug detalhado para as primeiras 3 chamadas
+        if (contemTermoDebugCount < 3) {
+            contemTermoDebugCount++;
+            debug(`contemTermo() chamado #${contemTermoDebugCount}`);
+            debug(`  termos.length = ${termos.length}`);
+            debug(`  texto (50 chars) = "${texto.substring(0, 50)}"`);
+            debug(`  textoNorm (50 chars) = "${textoNorm.substring(0, 50)}"`);
+            debug(`  textoNorm.includes("terror") = ${textoNorm.includes("terror")}`);
+            debug(`  termos.includes("terror") = ${termos.includes("terror")}`);
+
+            // Testa regex manual
+            const testRegex = new RegExp('\\b' + 'terror' + '\\b', 'i');
+            debug(`  Regex manual /\\bterror\\b/i.test(textoNorm) = ${testRegex.test(textoNorm)}`);
+
+            // Mostra os primeiros 5 termos da lista
+            debug(`  Primeiros 5 termos: ${JSON.stringify(termos.slice(0, 5))}`);
+
+            // Testa criarRegex para "terror"
+            if (termos.includes("terror")) {
+                const r = criarRegex("terror");
+                debug(`  criarRegex("terror") = ${r}`);
+                debug(`  criarRegex("terror").test(textoNorm) = ${r.test(textoNorm)}`);
+            }
+        }
+
         for (const termo of termos) {
             if (criarRegex(termo).test(textoNorm)) {
                 return termo;
@@ -91,6 +121,7 @@ window.BloqueadorParental = (function() {
 
                     termos = lista;
                     regexCache.clear();
+                    contemTermoDebugCount = 0; // Reset debug count para nova lista
                     console.info(`${LOG_PREFIX} Lista atualizada: ${lista.length} termos baixados.`);
                 } else if (response.status === 304) {
                     console.info(`${LOG_PREFIX} Lista não modificada, usando cache.`);
@@ -119,6 +150,13 @@ window.BloqueadorParental = (function() {
     carregarTermos();
     sincronizarLista();
 
+    // AUTO-TESTE: verifica se contemTermo funciona corretamente
+    if (termos.length > 0) {
+        const testResult = contemTermo("Teste de terror no YouTube");
+        debug(`AUTO-TESTE: contemTermo("Teste de terror no YouTube") = "${testResult}"`);
+        contemTermoDebugCount = 0; // Reset para não poluir os logs seguintes
+    }
+
     // API pública
     return {
         LOG_PREFIX,
@@ -131,3 +169,4 @@ window.BloqueadorParental = (function() {
         getTermos,
     };
 })();
+

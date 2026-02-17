@@ -105,6 +105,7 @@
             });
         }
 
+        let debugItemCount = 0;
         todosItens.forEach(item => {
             // Remoção de Ads
             if (item.querySelector('ytd-ad-slot-renderer') || item.tagName.toLowerCase() === 'ytd-ad-slot-renderer') {
@@ -116,12 +117,38 @@
             const textoOriginal = item.innerText || '';
             const textoLen = textoOriginal.length.toString();
 
-            if (item.dataset.bloqueioChecked === textoLen) return;
-            if (textoOriginal.trim().length < 3) return;
+            // Debug para os primeiros 3 itens
+            if (debugItemCount < 3) {
+                debugItemCount++;
+                debug(`  Processando item #${debugItemCount}:`);
+                debug(`    textoLen = ${textoLen}`);
+                debug(`    bloqueioChecked = ${item.dataset.bloqueioChecked}`);
+                debug(`    bloqueioChecked === textoLen? ${item.dataset.bloqueioChecked === textoLen}`);
+            }
 
-            if (estaNoWhitelist(textoOriginal)) {
-                item.dataset.bloqueioChecked = textoLen;
+            if (item.dataset.bloqueioChecked === textoLen) {
+                if (debugItemCount <= 3) debug(`    → SKIP: já verificado`);
                 return;
+            }
+
+            if (textoOriginal.trim().length < 3) {
+                if (debugItemCount <= 3) debug(`    → SKIP: texto muito curto`);
+                return;
+            }
+
+            const isWhitelisted = estaNoWhitelist(textoOriginal);
+            if (debugItemCount <= 3) {
+                debug(`    estaNoWhitelist? ${isWhitelisted}`);
+            }
+
+            if (isWhitelisted) {
+                item.dataset.bloqueioChecked = textoLen;
+                if (debugItemCount <= 3) debug(`    → SKIP: whitelist`);
+                return;
+            }
+
+            if (debugItemCount <= 3) {
+                debug(`    → Chamando contemTermo()...`);
             }
 
             const match = contemTermo(textoOriginal);
